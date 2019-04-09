@@ -1,3 +1,14 @@
+
+# macOS metadata
+.DS_Store
+
+# Test data
+*.csv
+data/
+
+# VSCode settings
+.vscode
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

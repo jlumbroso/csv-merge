@@ -1,0 +1,31 @@
+input:
+  path: "./data/"
+  username: "Student ID"
+  value: "Overall grade"
+output:
+  username: "NetID"
+summary:
+  "Assignment-PS 0 grades*.csv":
+    header: "PS0"
+  "Assignment-PS 1 grades*.csv":
+    header: "PS1"
+  "Assignment-PS1 Extra*.csv":
+    header: "PS1-Extra"
+  "Assignment-PS 2 Problems*.csv":
+    header: "PS2"
+  "Assignment-PS 2 Extra*.csv":
+    header: "PS2-Extra"
+  "Assignment-PS3 Problems*.csv":
+    header: "PS3"
+  "Assignment-PS 3 Extra*.csv":
+    header: "PS3-Extra"
+  "Assignment-Midterm 1*.csv":
+    header: "Mid"
+  "SD1_grades*.csv":
+    header: "SD1"
+    username: "Username"
+    value: "SD1 Grade out of 30"
+  "SD2_grades*.csv":
+    header: "SD2"
+    username: "Username"
+    value: "SD2 Grade out of 30"
