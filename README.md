@@ -22,32 +22,33 @@ optional arguments:
 
 Consider the following set of files:
 
-- `data/sourceA.csv`:
-  ```csv
-  Username,email,total
-  jsmith,joe@smith.com,13
-  dkapoor,dk@gmail.com,17
-  azhang,azhang@yahoo.net,19
-  ```
-- `data/sourceB.csv`:
-  ```csv
-  User,total
-  dkapoor,32
-  azhang,39
-  ```
-- `data/sourceC.csv`:
-  ```csv
-  Username,total
-  jsmith,10
-  azhang,11
-  ```
-- `data/sourceC_v2.csv`:
-  ```csv
-  Username,correct
-  azhang,12
-  jsmith,9
-  ```
-- `summary.yaml`:
+- Data files in a `data` sub-folder:
+  - `data/sourceA.csv`:
+    ```csv
+    Username,email,total
+    jsmith,joe@smith.com,13
+    dkapoor,dk@gmail.com,17
+    azhang,azhang@yahoo.net,19
+    ```
+  - `data/sourceB.csv`:
+    ```csv
+    User,total
+    dkapoor,32
+    azhang,39
+    ```
+  - `data/sourceC.csv`:
+    ```csv
+    Username,total
+    jsmith,10
+    azhang,11
+    ```
+  - `data/sourceC_v2.csv`:
+    ```csv
+    Username,correct
+    azhang,12
+    jsmith,9
+    ```
+- A human-readable YAML configuration file, `summary.yaml`, that describes how to merge these files:
   ```yaml
   defaults:
     path: "./data/"
@@ -65,7 +66,8 @@ Consider the following set of files:
       caption: "PartC"
       value: "correct"
   ```
-  These files can be combined by calling `csv-merge`:
+
+These files can be combined by calling `csv-merge`:
 
 ```
 csv-merge -y summary.yaml -o output.csv
