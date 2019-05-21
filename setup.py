@@ -6,7 +6,7 @@ README = open("README.md").read()
 # This call to setup() does all the work
 setup(
     name="csv-merge",
-    version="0.9.0",
+    version="0.1.0",
     description="""
       Command line tools to merge the most recent version of several CSV files
       containing data on the same users, into one up-to-date CSV file, according
