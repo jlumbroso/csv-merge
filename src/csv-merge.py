@@ -120,20 +120,31 @@ def process_command_line(parser):
 
     yaml_file = params.get("y", DEFAULT_YAML) or DEFAULT_YAML
 
-    logger.debug("Configuration File: '{}'".format(yaml_file))
+    candidates = []
+    candidates.append(DEFAULT_YAML)
+    candidates.append(yaml_file)
+    candidates.append(os.path.join(yaml_file, DEFAULT_YAML))
+    candidates = list(
+        filter(os.path.isfile, filter(os.path.exists, candidates)))
 
-    if not os.path.exists(yaml_file):
+    if len(candidates) == 0:
         logger.error(
-            "Configuration File: File '{}' does not exist".format(yaml_file))
+            "Configuration File: File '{}' is invalid".format(yaml_file))
         logger.error("Call with --help for more information")
         sys.exit(1)
+
+    if not yaml_file in candidates:
+        yaml_file = candidates[0]
+
+    logger.debug(
+        "Configuration File: {}".format(yaml_file))
 
     config = dict()
     try:
         config = yaml.load(open(yaml_file))
     except Exception:
         logger.exception("Configuration File: Error while reading")
-        logger.exception("Call with --help for more information")
+        logger.error("Call with --help for more information")
 
     logger.debug("Configuration File: {}".format(config))
 
