@@ -60,7 +60,7 @@ class SimpleColorFormatter(logging.Formatter):
 
 def setupLogging(name=None, level="INFO"):
 
-    # Add the color handler to the terminal output
+    # Add the color handler to the terminal output (sys.stderr)
     handler = logging.StreamHandler()
     formatter = SimpleColorFormatter()
     handler.setFormatter(formatter)
@@ -79,20 +79,31 @@ def setupLogging(name=None, level="INFO"):
 logger = setupLogging()
 
 ###############################################################################
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(
+    description="""
+    Merge the most recent version of several CSV files containing data on the
+    same users, into one up-to-date CSV file, according to a YAML configuration
+    file.
+    """
+)
 
 parser.add_argument(
     "-y",
-    help="Name of the YAML job description.")
+    help="name of the YAML job description.")
 
 parser.add_argument(
     "-p",
-    help="Name of the YAML patch file (optional).")
+    help="name of the YAML patch file (optional).")
+
+parser.add_argument(
+    "-o",
+    help="output file name (optional, default /dev/stdout).",
+    default="/dev/stdout")
 
 parser.add_argument(
     "--verbose",
     action="store_true",
-    help="Display informational messages.")
+    help="display informational messages (info+debug output).")
 
 
 def process_command_line(parser):
@@ -113,7 +124,8 @@ def process_command_line(parser):
 
     if not os.path.exists(yaml_file):
         logger.error(
-            "Configuration File: File does not exist")
+            "Configuration File: File '{}' does not exist".format(yaml_file))
+        logger.error("Call with --help for more information")
         sys.exit(1)
 
     config = dict()
@@ -121,13 +133,23 @@ def process_command_line(parser):
         config = yaml.load(open(yaml_file))
     except Exception:
         logger.exception("Configuration File: Error while reading")
+        logger.exception("Call with --help for more information")
 
     logger.debug("Configuration File: {}".format(config))
 
     # Complete config with command-line parameters
     config["yaml"] = yaml_file
-    if params["p"]:
+    if params.get("p", None):
         config["patch"] = params["p"]
+        logger.debug(
+            "Command Line: Patch param '{}'".format(params["p"]))
+
+    if params.get("o", None):
+        config["output"] = config.get("output", dict())
+        config["output"]["path"] = config["output"].get("path", "")
+        config["output"]["filename"] = params["o"]
+        logger.debug(
+            "Command Line: Output file param '{}'".format(params["o"]))
 
     logger.debug("Configuration: {}".format(config))
 
@@ -163,15 +185,16 @@ for p in pattern_list:
 
     # Locate file
     fp = os.path.join(ip_default_path, p)
+
     results = glob.glob(fp)
+    results.sort()
+
     logger.debug("Globbing '{}' yielded: {}.".format(fp, results))
     if len(results) == 0:
         continue
 
     # Last in lexicographic order
-    results.sort()
     last_result = results[-1]
-
     filename = last_result
 
     # Info
@@ -237,8 +260,17 @@ if patch_pattern:
         ))
 
 # Output the aggregated data
-print(",".join(full_headers))
-for user in full_data.keys():
-    userdata = full_data[user]
-    userdata[op_default_userkey] = user
-    print(",".join(map(lambda colname: userdata.get(colname, ""), full_headers)))
+output_filename = os.path.join(
+    config["output"].get("path", ""),
+    config["output"].get("filename", "/dev/stdout"))
+
+logger.debug("Output path: {}".format(output_filename))
+
+with open(output_filename, "w") as f:
+    f.write(",".join(full_headers))
+    f.write("\n")
+    for user in full_data.keys():
+        userdata = full_data[user]
+        userdata[op_default_userkey] = user
+        f.write(",".join(map(lambda colname: userdata.get(colname, ""), full_headers)))
+        f.write("\n")
