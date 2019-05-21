@@ -13,6 +13,8 @@ import sys
 import yaml
 from QuotedCSV import read_csv
 
+# Simpleeval library for calculated columns and expressions
+import simpleeval
 
 ###############################################################################
 
@@ -186,11 +188,11 @@ op_default_userkey = config.get(
 
 # Processing files one by one
 
-pattern_list = config.get("sources", dict()).keys()
-counter = 0
-
 full_data = collections.OrderedDict()
 full_headers = [op_default_userkey]
+
+pattern_list = config.get("sources", dict()).keys()
+counter = 0
 
 for p in pattern_list:
 
