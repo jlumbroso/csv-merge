@@ -172,24 +172,22 @@ def process_command_line(parser):
 # Loading YAML file
 config = process_command_line(parser)
 
-# Some default properties
+# Configure some default properties (config variable is used throughout)
 
-ip_default_userkey = config.get(
-    "defaults", dict()).get("username", "Username")
+config["defaults"] = config.get("defaults", dict())
 
-ip_default_valuekey = config.get(
-    "defaults", dict()).get("value", "Value")
+config["defaults"]["username"] = config["defaults"].get("username", "Username")
+config["defaults"]["value"] = config["defaults"].get("value", "Value")
+config["defaults"]["path"] = config["defaults"].get("path", "")
 
-ip_default_path = config.get(
-    "defaults", dict()).get("path", "")
+config["output"] = config.get("output", dict())
 
-op_default_userkey = config.get(
-    "output", dict()).get("username", "Username")
+config["output"]["username"] = config["output"].get("username", config["defaults"]["username"])
 
 # Processing files one by one
 
 full_data = collections.OrderedDict()
-full_headers = [op_default_userkey]
+full_headers = [config["output"]["username"]]
 
 pattern_list = config.get("sources", dict()).keys()
 counter = 0
@@ -197,12 +195,13 @@ counter = 0
 for p in pattern_list:
 
     # Locate file
-    fp = os.path.join(ip_default_path, p)
+    fp = os.path.join(config["defaults"]["path"], p)
 
     results = glob.glob(fp)
     results.sort()
 
     logger.debug("Globbing '{}' yielded: {}.".format(fp, results))
+    logger.info(config["sources"][p].get("include", list())[:1])
     if len(results) == 0:
         continue
 
@@ -217,8 +216,8 @@ for p in pattern_list:
     counter += 1
     unique_header = "Header{:0<3}".format(counter)
 
-    userkey = config["sources"][p].get("username", ip_default_userkey)
-    valuekey = config["sources"][p].get("value", ip_default_valuekey)
+    userkey = config["sources"][p].get("username", config["defaults"]["username"])
+    valuekey = config["sources"][p].get("value", config["defaults"]["value"])
     header = config["sources"][p].get("caption", unique_header)
 
     # Expand the header list
@@ -284,6 +283,6 @@ with open(output_filename, "w") as f:
     f.write("\n")
     for user in full_data.keys():
         userdata = full_data[user]
-        userdata[op_default_userkey] = user
+        userdata[config["output"]["username"]] = user
         f.write(",".join(map(lambda colname: userdata.get(colname, ""), full_headers)))
         f.write("\n")
