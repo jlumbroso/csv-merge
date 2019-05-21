@@ -1,4 +1,4 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 
 # Python 2
 from __future__ import print_function
@@ -140,20 +140,20 @@ config = process_command_line(parser)
 # Some default properties
 
 ip_default_userkey = config.get(
-    "input", dict()).get("username", "Username")
+    "defaults", dict()).get("username", "Username")
 
 ip_default_valuekey = config.get(
-    "input", dict()).get("value", "Value")
+    "defaults", dict()).get("value", "Value")
 
 ip_default_path = config.get(
-    "input", dict()).get("path", "")
+    "defaults", dict()).get("path", "")
 
 op_default_userkey = config.get(
     "output", dict()).get("username", "Username")
 
 # Processing files one by one
 
-pattern_list = config.get("summary", dict()).keys()
+pattern_list = config.get("sources", dict()).keys()
 counter = 0
 
 full_data = collections.OrderedDict()
@@ -162,21 +162,28 @@ full_headers = [op_default_userkey]
 for p in pattern_list:
 
     # Locate file
-    results = glob.glob(os.path.join(ip_default_path, p))
+    fp = os.path.join(ip_default_path, p)
+    results = glob.glob(fp)
+    logger.debug("Globbing '{}' yielded: {}.".format(fp, results))
     if len(results) == 0:
         continue
-    filename = results[0]
+
+    # Last in lexicographic order
+    results.sort()
+    last_result = results[-1]
+
+    filename = last_result
 
     # Info
-    #print(">>> Reading {}".format(filename))
+    logger.debug(">>> Reading {}".format(filename))
 
     # Get parameters
     counter += 1
     unique_header = "Header{:0<3}".format(counter)
 
-    userkey = config["summary"][p].get("username", ip_default_userkey)
-    valuekey = config["summary"][p].get("value", ip_default_valuekey)
-    header = config["summary"][p].get("header", unique_header)
+    userkey = config["sources"][p].get("username", ip_default_userkey)
+    valuekey = config["sources"][p].get("value", ip_default_valuekey)
+    header = config["sources"][p].get("caption", unique_header)
 
     # Expand the header list
     full_headers.append(header)
@@ -196,7 +203,38 @@ for p in pattern_list:
         full_data[user][header] = value
 
 # Patch the data
+patch_pattern = config.get("patch")
+if patch_pattern:
+    patch_files = glob.glob(patch_pattern)
+    logger.debug("Candidates for patch file: {}".format(patch_files))
+    patch_file = patch_files[-1]
+    logger.debug(
+        "Running last one by lexicographic order: {}".format(patch_file))
+    rows = read_csv(patch_file, as_dict=True)
 
+    logger.debug("Patch: {}".format(rows))
+
+    for patch in rows:
+        user = patch.get("Username", None)
+        header = patch.get("Caption", None)
+        patched_value = patch.get("Value", None)
+
+        if user == None or header == None or value == None:
+            continue
+
+        prev_value = full_data.get(user, dict()).get(header, None)
+
+        if not user in full_data:
+            logger.debug("Adding new user '{}' by patch".format(user))
+            full_data[user] = dict()
+
+        full_data[user][header] = patched_value
+        logger.debug("Patch: data [{}.{}] {} => {}".format(
+            user,
+            header,
+            prev_value,
+            patched_value
+        ))
 
 # Output the aggregated data
 print(",".join(full_headers))

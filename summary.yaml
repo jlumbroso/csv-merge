@@ -1,31 +1,45 @@
-input:
+defaults:
   path: "./data/"
   username: "Student ID"
   value: "Overall grade"
 output:
   username: "NetID"
-summary:
+sources:
   "Assignment-PS 0 grades*.csv":
-    header: "PS0"
+    caption: "PS0"
   "Assignment-PS 1 grades*.csv":
-    header: "PS1"
+    caption: "PS1"
   "Assignment-PS1 Extra*.csv":
-    header: "PS1-Extra"
+    caption: "PS1-Extra"
   "Assignment-PS 2 Problems*.csv":
-    header: "PS2"
+    caption: "PS2"
   "Assignment-PS 2 Extra*.csv":
-    header: "PS2-Extra"
+    caption: "PS2-Extra"
   "Assignment-PS3 Problems*.csv":
-    header: "PS3"
+    caption: "PS3"
   "Assignment-PS 3 Extra*.csv":
-    header: "PS3-Extra"
+    caption: "PS3-Extra"
   "Assignment-Midterm 1*.csv":
-    header: "Mid"
+    caption: "Mid1"
+  "Assignment-PS 4 Problems*.csv":
+    caption: "PS4"
+  "Assignment-PS 4 Extra*.csv":
+    caption: "PS4-Extra"
+  "Assignment-Midterm 2*.csv":
+    caption: "Mid2"
   "SD1_grades*.csv":
-    header: "SD1"
+    caption: "SD1"
     username: "Username"
     value: "SD1 Grade out of 30"
   "SD2_grades*.csv":
-    header: "SD2"
+    caption: "SD2"
     username: "Username"
     value: "SD2 Grade out of 30"
+  "SD3_grades*.csv":
+    caption: "SD3"
+    username: "Username"
+    value: "SD3 Grade out of 30"
+  "SD4_grades*.csv":
+    caption: "SD4"
+    username: "Username"
+    value: "SD4 Grade out of 30"
