@@ -254,6 +254,42 @@ def extract_spec_internal_ref(username, record, item, maxs=dict()):
         "weight": weight,
     }
 
+def apply_patch(config):
+    global full_data
+
+    patch_pattern = config.get("patch")
+    if patch_pattern:
+        patch_files = glob.glob(patch_pattern)
+        logger.debug("Candidates for patch file: {}".format(patch_files))
+        patch_file = patch_files[-1]
+        logger.debug(
+            "Running last one by lexicographic order: {}".format(patch_file))
+        rows = read_csv(patch_file, as_dict=True)
+
+        logger.debug("Patch: {}".format(rows))
+
+        for patch in rows:
+            user = patch.get("Username", None)
+            header = patch.get("Caption", None)
+            patched_value = patch.get("Value", None)
+
+            if user == None or header == None or patched_value == None:
+                continue
+
+            prev_value = full_data.get(user, dict()).get(header, None)
+
+            if not user in full_data:
+                logger.debug("Adding new user '{}' by patch".format(user))
+                full_data[user] = dict()
+
+            full_data[user][header] = patched_value
+            logger.debug("Patch: data [{}.{}] {} => {}".format(
+                user,
+                header,
+                prev_value,
+                patched_value
+            ))
+
 def process_source(name, specification, config):
     global counter, full_headers, full_data
 
@@ -322,6 +358,11 @@ def process_source(name, specification, config):
 
         logger.debug("Type: Range")
 
+        # FIXME: Be more efficient about this (reapplying patch to have final values
+        # of patched columns in calculated columns)
+        logger.debug("Reprochessing patches...")
+        apply_patch(config)
+
         input_field = specification.get("input", None)
         ranges = specification.get("ranges", list())
 
@@ -376,6 +417,11 @@ def process_source(name, specification, config):
         # TYPE: Calculated > Normalized Sum
 
         logger.debug("Type: Normalized Sum")
+
+        # FIXME: Be more efficient about this (reapplying patch to have final values
+        # of patched columns in calculated columns)
+        logger.debug("Reprochessing patches...")
+        apply_patch(config)
 
         # Compute maximums
         maxs = {}
@@ -498,38 +544,7 @@ for (name, specification) in config.get("sources", dict()).items():
     
 
 # Patch the data
-patch_pattern = config.get("patch")
-if patch_pattern:
-    patch_files = glob.glob(patch_pattern)
-    logger.debug("Candidates for patch file: {}".format(patch_files))
-    patch_file = patch_files[-1]
-    logger.debug(
-        "Running last one by lexicographic order: {}".format(patch_file))
-    rows = read_csv(patch_file, as_dict=True)
-
-    logger.debug("Patch: {}".format(rows))
-
-    for patch in rows:
-        user = patch.get("Username", None)
-        header = patch.get("Caption", None)
-        patched_value = patch.get("Value", None)
-
-        if user == None or header == None or patched_value == None:
-            continue
-
-        prev_value = full_data.get(user, dict()).get(header, None)
-
-        if not user in full_data:
-            logger.debug("Adding new user '{}' by patch".format(user))
-            full_data[user] = dict()
-
-        full_data[user][header] = patched_value
-        logger.debug("Patch: data [{}.{}] {} => {}".format(
-            user,
-            header,
-            prev_value,
-            patched_value
-        ))
+apply_patch(config)
 
 # Output the aggregated data
 output_filename = os.path.join(
