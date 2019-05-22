@@ -25,6 +25,10 @@ sources:
     caption: "PS4"
   "Assignment-PS 4 Extra*.csv":
     caption: "PS4-Extra"
+  "Assignment-PS 5 all*.csv":
+    caption: "PS5"
+  "Assignment-PS 5 extra*.csv":
+    caption: "PS5-Extra"
   "Assignment-Midterm 2*.csv":
     caption: "Mid2"
   "SD1_grades*.csv":
@@ -43,13 +47,20 @@ sources:
     caption: "SD4"
     username: "Username"
     value: "SD4 Grade out of 30"
-  Calculated1:
+  "SD5_grades*.csv":
+    caption: "SD5"
+    username: "Username"
+    value: "SD5 Grade out of 30"
+  "Assignment-Final*.csv":
+    caption: "Final"
+  CalculatedHomework:
     caption: "Homework"
     type: "normalized-sum"
-    include: ["PS0", "PS1", "PS2", "PS3", "PS4", "SD1", "SD2", "SD3", "SD4"]
+    include: ["PS0", "PS1", "PS2", "PS3", "PS4", "PS5", "SD1", "SD2", "SD3", "SD4", "SD5"]
     # extra: ["PS1-Extra", "PS2-Extra", "PS3-Extra", "PS4-Extra"]
-    partial: False
-  Calculated2:
+    partial: True
+    prorata: True
+  CalculatedOverall:
     caption: "Overall"
     type: "normalized-sum"
     include:
@@ -61,4 +72,24 @@ sources:
         weight: 30.0
       - value: "Homework"
         weight: 35.0
-    partial: False
+  LetterGrade:
+    caption: "Letter"
+    type: "range"
+    input: "Overall"
+    ranges:
+      - value: "A"
+        lowerbound: 92.0
+      - value: "A-"
+        lowerbound: 88.0
+      - value: "B+"
+        lowerbound: 83.0
+      - value: "B"
+        lowerbound: 75.0
+      - value: "B-"
+        lowerbound: 65.0
+      - value: "C+"
+        lowerbound: 55.0
+      - value: "C"
+        lowerbound: 50.0
+      - value: "C-"
+        lowerbound: 0.0

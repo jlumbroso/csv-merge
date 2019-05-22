@@ -200,7 +200,7 @@ def extract_spec_internal_ref(username, record, item, maxs=dict()):
     header = None
     value_available = True
 
-    if isinstance(item, collections.Mapping):
+    if isinstance(item, collections.abc.Mapping):
         weight = item.get("weight", weight)
         header = item.get("value", None)
     elif isinstance(item, str):
@@ -215,7 +215,7 @@ def extract_spec_internal_ref(username, record, item, maxs=dict()):
         return None
 
     if not header in maxs:
-        logger.warn(
+        logger.warning(
             ("Include List: " +
                 "Header '{}' for user '{}', item '{}' has no normalization").format(
                 header, username, item
@@ -274,7 +274,7 @@ def process_source(name, specification, config):
         results.sort()
 
         logger.debug("Globbing '{}' yielded: {}.".format(fp, results))
-        logger.info(specification.get("include", list())[:1])
+        #logger.info(specification.get("include", list())[:1])
         if len(results) == 0:
             return
 
@@ -316,6 +316,60 @@ def process_source(name, specification, config):
                 full_data[user] = full_data.get(user, collections.OrderedDict())
                 full_data[user][header] = value
 
+    elif source_type == "range":
+        # ================================================================>
+        # TYPE: Calculated > Range
+
+        logger.debug("Type: Range")
+
+        input_field = specification.get("input", None)
+        ranges = specification.get("ranges", list())
+
+        computed_ranges = collections.OrderedDict()
+
+        for (username, record) in full_data.items():
+            if not input_field in record:
+                continue
+            
+            try:
+                input_value = float(record.get(input_field, None))
+            except:
+                continue
+            
+            logger.debug("* User '{}', computing range column '{}'".format(
+                username, name))
+
+            output_value = None
+            for range_bracket in ranges:
+                logger.debug("    - User '{}' assessing range {}".format(username, range_bracket))
+                range_lb = range_bracket.get("lowerbound", 0.0)
+                if input_value > range_lb:
+                    output_value = range_bracket.get("value", None)
+                    break
+
+            logger.debug("=> User '{}', column '{}': {}".format(
+                username, name, output_value))
+            
+            if output_value == None:
+                continue
+
+            computed_ranges[username] = output_value
+        
+        # Insert it into full-structure
+        counter += 1
+        unique_header = "Header{:0<3}".format(counter)
+        header = specification.get("caption", unique_header)
+
+        full_headers.append(header)
+
+        for user, range_value in computed_ranges.items():
+            full_data[user] = full_data.get(user, collections.OrderedDict())
+            full_data[user][header] = range_value
+        
+        return
+
+
+
     elif source_type == "normalized-sum":
 
         # ================================================================>
@@ -326,7 +380,7 @@ def process_source(name, specification, config):
         # Compute maximums
         maxs = {}
         for row in full_data.values():
-            if row == None or not isinstance(row, collections.Mapping):
+            if row == None or not isinstance(row, collections.abc.Mapping):
                 continue
             for key, value in row.items():
                 if value == "":
@@ -346,10 +400,12 @@ def process_source(name, specification, config):
             points_numerator = 0.0
             points_denominator = 0.0
             
-            partial = specification.get("partial", False)
+            arg_partial = specification.get("partial", False)
+            arg_prorata = specification.get("prorata", False)
             include_list = specification.get("include", list())
             extra_list = specification.get("extra", list())
             missing = False
+            corrupt = False
 
             for item in include_list:
                 
@@ -363,16 +419,17 @@ def process_source(name, specification, config):
                 
                 # Now we have everything to make our calculation
                 if not row or not row.get("available", False):
-                    if partial:
+                    if arg_prorata:
                         # When counting partial, don't penalize for unavailable values
                         continue
                     else:
+                        missing = True
                         if not row:
                             logger.debug(
                                 "=> User '{}', normalized sum '{}', item '{}': Corrupt".format(
                                     username, name, item
                                 ))
-                            missing = True
+                            corrupt = True
                             continue
                 
                 points_numerator += row["weight"] * row["value"]
@@ -396,8 +453,13 @@ def process_source(name, specification, config):
 
             logger.debug("=> User '{}', normalized sum '{}': {} / {}".format(
                 username, name, points_numerator, points_denominator))
-            if missing or points_denominator < 0.9:
+
+            if corrupt or points_denominator < 0.9:
                 logger.debug("=> User '{}', normalized sum '{}': Not available".format(username, name))
+                continue
+            
+            if missing and not arg_partial:
+                logger.debug("=> User '{}', normalized sum '{}': Missing values, skipping".format(username, name))
                 continue
 
             # Compute total
@@ -476,11 +538,15 @@ output_filename = os.path.join(
 
 logger.debug("Output path: {}".format(output_filename))
 
-with open(output_filename, "w") as f:
-    f.write(",".join(full_headers))
-    f.write("\n")
-    for user in full_data.keys():
-        userdata = full_data[user]
-        userdata[config["output"]["username"]] = user
-        f.write(",".join(map(lambda colname: userdata.get(colname, ""), full_headers)))
+try:
+    with open(output_filename, "w") as f:
+        f.write(",".join(full_headers))
         f.write("\n")
+        for user in full_data.keys():
+            userdata = full_data[user]
+            userdata[config["output"]["username"]] = user
+            f.write(",".join(map(lambda colname: userdata.get(colname, ""), full_headers)))
+            f.write("\n")
+
+except BrokenPipeError:
+    logger.warning("Data could not be piped to next program because of a pipe error")
