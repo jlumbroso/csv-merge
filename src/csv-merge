@@ -192,50 +192,248 @@ full_headers = [config["output"]["username"]]
 pattern_list = config.get("sources", dict()).keys()
 counter = 0
 
-for p in pattern_list:
+DEFAULT_TYPE = "csv"
+TYPES_FILE = [ "csv" ]
 
-    # Locate file
-    fp = os.path.join(config["defaults"]["path"], p)
+def extract_spec_internal_ref(username, record, item, maxs=dict()):
+    weight = 1.0
+    header = None
+    value_available = True
 
-    results = glob.glob(fp)
-    results.sort()
+    if isinstance(item, collections.Mapping):
+        weight = item.get("weight", weight)
+        header = item.get("value", None)
+    elif isinstance(item, str):
+        header = item
+    
+    if not header:
+        logger.debug(
+            ("Include List: " +
+                "Header for user '{}', item '{}' could not be computed").format(
+                username, item
+            ))
+        return None
 
-    logger.debug("Globbing '{}' yielded: {}.".format(fp, results))
-    logger.info(config["sources"][p].get("include", list())[:1])
-    if len(results) == 0:
-        continue
+    if not header in maxs:
+        logger.warn(
+            ("Include List: " +
+                "Header '{}' for user '{}', item '{}' has no normalization").format(
+                header, username, item
+            ))
+        return None
+    
+    value = record.get(header)
+    normalization = maxs.get(header)
 
-    # Last in lexicographic order
-    last_result = results[-1]
-    filename = last_result
+    # Empty value, silently skip
+    if not value or value == "":
+        value_available = False
+        value = "0.0"
 
-    # Info
-    logger.debug(">>> Reading {}".format(filename))
+    try:
+        float_value = float(value)
+        value = float_value
+    except Exception:
+        logger.debug("Could not float parse string '{}', assuming 0.0".format(value))
+        value = 0.0
+        value_available = False
+    
+    try:
+        float_weight = float(weight)
+        weight = float_weight
+    except Exception:
+        logger.debug("Could not float parse weight '{}', assuming 1.0".format(weight))
+        weight = 1.0
+    
+    return {
+        "username": username,
+        "header": header,
+        "value": value,
+        "available": value_available,
+        "normalization": normalization,
+        "weight": weight,
+    }
 
-    # Get parameters
-    counter += 1
-    unique_header = "Header{:0<3}".format(counter)
+def process_source(name, specification, config):
+    global counter, full_headers, full_data
 
-    userkey = config["sources"][p].get("username", config["defaults"]["username"])
-    valuekey = config["sources"][p].get("value", config["defaults"]["value"])
-    header = config["sources"][p].get("caption", unique_header)
+    source_type = specification.get("type", DEFAULT_TYPE)
 
-    # Expand the header list
-    full_headers.append(header)
+    logger.debug("Processing source '{}'".format(name))
 
-    # Obtain data
-    rows = read_csv(filename, as_dict=True)
+    if source_type in TYPES_FILE:
 
-    # Insert it into full-structure
-    for row in rows:
-        user = row[userkey]
-        value = row[valuekey]
+        # ================================================================>
+        # TYPE: Input File Source
 
-        if user.strip() == "":
-            continue
+        logger.debug("Type: Input File")
 
-        full_data[user] = full_data.get(user, collections.OrderedDict())
-        full_data[user][header] = value
+        fp = os.path.join(config["defaults"]["path"], name)
+
+        results = glob.glob(fp)
+        results.sort()
+
+        logger.debug("Globbing '{}' yielded: {}.".format(fp, results))
+        logger.info(specification.get("include", list())[:1])
+        if len(results) == 0:
+            return
+
+        # Last in lexicographic order
+        last_result = results[-1]
+        filename = last_result
+
+        # Info
+        logger.debug(">>> Reading {}".format(filename))
+
+        if source_type == "csv":
+            # ============================================================>
+            # TYPE: CSV file
+
+            logger.debug("Type: CSV Input File")
+
+            # Get parameters
+            counter += 1
+            unique_header = "Header{:0<3}".format(counter)
+
+            userkey = specification.get("username", config["defaults"]["username"])
+            valuekey = specification.get("value", config["defaults"]["value"])
+            header = specification.get("caption", unique_header)
+
+            # Expand the header list
+            full_headers.append(header)
+
+            # Obtain data
+            rows = read_csv(filename, as_dict=True)
+
+            # Insert it into full-structure
+            for row in rows:
+                user = row[userkey]
+                value = row[valuekey]
+
+                if user.strip() == "":
+                    continue
+
+                full_data[user] = full_data.get(user, collections.OrderedDict())
+                full_data[user][header] = value
+
+    elif source_type == "normalized-sum":
+
+        # ================================================================>
+        # TYPE: Calculated > Normalized Sum
+
+        logger.debug("Type: Normalized Sum")
+
+        # Compute maximums
+        maxs = {}
+        for row in full_data.values():
+            if row == None or not isinstance(row, collections.Mapping):
+                continue
+            for key, value in row.items():
+                if value == "":
+                    continue
+                try:
+                    f_value = float(value)
+                except:
+                    continue
+                maxs[key] = max(f_value, maxs.get(key, 0.0))
+
+        logger.debug("Detected Maxima: {}".format(maxs))
+
+        computed_normalized_sums = collections.OrderedDict()
+
+        for (username, record) in full_data.items():
+            logger.debug(" - Evaluating '{}' for '{}' => {}".format(username, name, record))
+            points_numerator = 0.0
+            points_denominator = 0.0
+            
+            partial = specification.get("partial", False)
+            include_list = specification.get("include", list())
+            extra_list = specification.get("extra", list())
+            missing = False
+
+            for item in include_list:
+                
+                row = extract_spec_internal_ref(
+                    username=username,
+                    record=record,
+                    item=item,
+                    maxs=maxs
+                )
+                logger.debug("   * Processing: {}".format(row))
+                
+                # Now we have everything to make our calculation
+                if not row or not row.get("available", False):
+                    if partial:
+                        # When counting partial, don't penalize for unavailable values
+                        continue
+                    else:
+                        if not row:
+                            logger.debug(
+                                "=> User '{}', normalized sum '{}', item '{}': Corrupt".format(
+                                    username, name, item
+                                ))
+                            missing = True
+                            continue
+                
+                points_numerator += row["weight"] * row["value"]
+                points_denominator += row["weight"] * row["normalization"]
+
+            for item in extra_list:
+                
+                row = extract_spec_internal_ref(
+                    username=username,
+                    record=record,
+                    item=item,
+                    maxs=maxs
+                )
+                logger.debug("   * Processing Extra: {}".format(row))
+                
+                # Now we have everything to make our calculation
+                if not row or not row["available"]:
+                    continue
+                
+                points_numerator += row["weight"] * row["value"]
+
+            logger.debug("=> User '{}', normalized sum '{}': {} / {}".format(
+                username, name, points_numerator, points_denominator))
+            if missing or points_denominator < 0.9:
+                logger.debug("=> User '{}', normalized sum '{}': Not available".format(username, name))
+                continue
+
+            # Compute total
+            try:
+                normalized_sum = float(points_numerator/points_denominator)
+            except:
+                logger.debug("Unexpected error while computing normalized sum")
+                raise
+
+            logger.debug("=> User '{}', normalized sum '{}': {}".format(
+                username, name, normalized_sum
+            ))
+
+            computed_normalized_sums[username] = normalized_sum
+        
+        # Insert it into full-structure
+        counter += 1
+        unique_header = "Header{:0<3}".format(counter)
+        header = specification.get("caption", unique_header)
+
+        full_headers.append(header)
+
+        for user, normalized_sum in computed_normalized_sums.items():
+            full_data[user] = full_data.get(user, collections.OrderedDict())
+            full_data[user][header] = "{:.2f}".format((normalized_sum)*100.0)
+        
+        return
+
+    else:
+
+        # Unsupported data type
+        return
+
+for (name, specification) in config.get("sources", dict()).items():
+    process_source(name=name, specification=specification, config=config)
+    
 
 # Patch the data
 patch_pattern = config.get("patch")
@@ -254,7 +452,7 @@ if patch_pattern:
         header = patch.get("Caption", None)
         patched_value = patch.get("Value", None)
 
-        if user == None or header == None or value == None:
+        if user == None or header == None or patched_value == None:
             continue
 
         prev_value = full_data.get(user, dict()).get(header, None)

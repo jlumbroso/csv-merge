@@ -43,3 +43,22 @@ sources:
     caption: "SD4"
     username: "Username"
     value: "SD4 Grade out of 30"
+  Calculated1:
+    caption: "Homework"
+    type: "normalized-sum"
+    include: ["PS0", "PS1", "PS2", "PS3", "PS4", "SD1", "SD2", "SD3", "SD4"]
+    # extra: ["PS1-Extra", "PS2-Extra", "PS3-Extra", "PS4-Extra"]
+    partial: False
+  Calculated2:
+    caption: "Overall"
+    type: "normalized-sum"
+    include:
+      - value: "Mid1"
+        weight: 15.0
+      - value: "Mid2"
+        weight: 20.0
+      - value: "Final"
+        weight: 30.0
+      - value: "Homework"
+        weight: 35.0
+    partial: False
