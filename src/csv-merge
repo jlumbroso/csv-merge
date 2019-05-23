@@ -6,6 +6,7 @@ from __future__ import print_function
 import argparse
 import collections
 import glob
+import json
 import logging
 import os
 import sys
@@ -182,7 +183,8 @@ config["defaults"]["path"] = config["defaults"].get("path", "")
 
 config["output"] = config.get("output", dict())
 
-config["output"]["username"] = config["output"].get("username", config["defaults"]["username"])
+config["output"]["username"] = config["output"].get(
+    "username", config["defaults"]["username"])
 
 # Processing files one by one
 
@@ -193,7 +195,8 @@ pattern_list = config.get("sources", dict()).keys()
 counter = 0
 
 DEFAULT_TYPE = "csv"
-TYPES_FILE = [ "csv" ]
+TYPES_FILE = ["csv"]
+
 
 def extract_spec_internal_ref(username, record, item, maxs=dict()):
     weight = 1.0
@@ -205,7 +208,7 @@ def extract_spec_internal_ref(username, record, item, maxs=dict()):
         header = item.get("value", None)
     elif isinstance(item, str):
         header = item
-    
+
     if not header:
         logger.debug(
             ("Include List: " +
@@ -221,7 +224,7 @@ def extract_spec_internal_ref(username, record, item, maxs=dict()):
                 header, username, item
             ))
         return None
-    
+
     value = record.get(header)
     normalization = maxs.get(header)
 
@@ -234,17 +237,19 @@ def extract_spec_internal_ref(username, record, item, maxs=dict()):
         float_value = float(value)
         value = float_value
     except Exception:
-        logger.debug("Could not float parse string '{}', assuming 0.0".format(value))
+        logger.debug(
+            "Could not float parse string '{}', assuming 0.0".format(value))
         value = 0.0
         value_available = False
-    
+
     try:
         float_weight = float(weight)
         weight = float_weight
     except Exception:
-        logger.debug("Could not float parse weight '{}', assuming 1.0".format(weight))
+        logger.debug(
+            "Could not float parse weight '{}', assuming 1.0".format(weight))
         weight = 1.0
-    
+
     return {
         "username": username,
         "header": header,
@@ -253,6 +258,7 @@ def extract_spec_internal_ref(username, record, item, maxs=dict()):
         "normalization": normalization,
         "weight": weight,
     }
+
 
 def apply_patch(config):
     global full_data
@@ -289,6 +295,7 @@ def apply_patch(config):
                 prev_value,
                 patched_value
             ))
+
 
 def process_source(name, specification, config):
     global counter, full_headers, full_data
@@ -331,7 +338,8 @@ def process_source(name, specification, config):
             counter += 1
             unique_header = "Header{:0<3}".format(counter)
 
-            userkey = specification.get("username", config["defaults"]["username"])
+            userkey = specification.get(
+                "username", config["defaults"]["username"])
             valuekey = specification.get("value", config["defaults"]["value"])
             header = specification.get("caption", unique_header)
 
@@ -349,7 +357,8 @@ def process_source(name, specification, config):
                 if user.strip() == "":
                     continue
 
-                full_data[user] = full_data.get(user, collections.OrderedDict())
+                full_data[user] = full_data.get(
+                    user, collections.OrderedDict())
                 full_data[user][header] = value
 
     elif source_type == "range":
@@ -371,18 +380,19 @@ def process_source(name, specification, config):
         for (username, record) in full_data.items():
             if not input_field in record:
                 continue
-            
+
             try:
                 input_value = float(record.get(input_field, None))
             except:
                 continue
-            
+
             logger.debug("* User '{}', computing range column '{}'".format(
                 username, name))
 
             output_value = None
             for range_bracket in ranges:
-                logger.debug("    - User '{}' assessing range {}".format(username, range_bracket))
+                logger.debug(
+                    "    - User '{}' assessing range {}".format(username, range_bracket))
                 range_lb = range_bracket.get("lowerbound", 0.0)
                 if input_value > range_lb:
                     output_value = range_bracket.get("value", None)
@@ -390,12 +400,12 @@ def process_source(name, specification, config):
 
             logger.debug("=> User '{}', column '{}': {}".format(
                 username, name, output_value))
-            
+
             if output_value == None:
                 continue
 
             computed_ranges[username] = output_value
-        
+
         # Insert it into full-structure
         counter += 1
         unique_header = "Header{:0<3}".format(counter)
@@ -406,10 +416,8 @@ def process_source(name, specification, config):
         for user, range_value in computed_ranges.items():
             full_data[user] = full_data.get(user, collections.OrderedDict())
             full_data[user][header] = range_value
-        
+
         return
-
-
 
     elif source_type == "normalized-sum":
 
@@ -442,10 +450,11 @@ def process_source(name, specification, config):
         computed_normalized_sums = collections.OrderedDict()
 
         for (username, record) in full_data.items():
-            logger.debug(" - Evaluating '{}' for '{}' => {}".format(username, name, record))
+            logger.debug(
+                " - Evaluating '{}' for '{}' => {}".format(username, name, record))
             points_numerator = 0.0
             points_denominator = 0.0
-            
+
             arg_partial = specification.get("partial", False)
             arg_prorata = specification.get("prorata", False)
             include_list = specification.get("include", list())
@@ -454,7 +463,7 @@ def process_source(name, specification, config):
             corrupt = False
 
             for item in include_list:
-                
+
                 row = extract_spec_internal_ref(
                     username=username,
                     record=record,
@@ -462,7 +471,7 @@ def process_source(name, specification, config):
                     maxs=maxs
                 )
                 logger.debug("   * Processing: {}".format(row))
-                
+
                 # Now we have everything to make our calculation
                 if not row or not row.get("available", False):
                     if arg_prorata:
@@ -477,12 +486,12 @@ def process_source(name, specification, config):
                                 ))
                             corrupt = True
                             continue
-                
+
                 points_numerator += row["weight"] * row["value"]
                 points_denominator += row["weight"] * row["normalization"]
 
             for item in extra_list:
-                
+
                 row = extract_spec_internal_ref(
                     username=username,
                     record=record,
@@ -490,22 +499,24 @@ def process_source(name, specification, config):
                     maxs=maxs
                 )
                 logger.debug("   * Processing Extra: {}".format(row))
-                
+
                 # Now we have everything to make our calculation
                 if not row or not row["available"]:
                     continue
-                
+
                 points_numerator += row["weight"] * row["value"]
 
             logger.debug("=> User '{}', normalized sum '{}': {} / {}".format(
                 username, name, points_numerator, points_denominator))
 
             if corrupt or points_denominator < 0.9:
-                logger.debug("=> User '{}', normalized sum '{}': Not available".format(username, name))
+                logger.debug(
+                    "=> User '{}', normalized sum '{}': Not available".format(username, name))
                 continue
-            
+
             if missing and not arg_partial:
-                logger.debug("=> User '{}', normalized sum '{}': Missing values, skipping".format(username, name))
+                logger.debug("=> User '{}', normalized sum '{}': Missing values, skipping".format(
+                    username, name))
                 continue
 
             # Compute total
@@ -520,7 +531,7 @@ def process_source(name, specification, config):
             ))
 
             computed_normalized_sums[username] = normalized_sum
-        
+
         # Insert it into full-structure
         counter += 1
         unique_header = "Header{:0<3}".format(counter)
@@ -531,7 +542,7 @@ def process_source(name, specification, config):
         for user, normalized_sum in computed_normalized_sums.items():
             full_data[user] = full_data.get(user, collections.OrderedDict())
             full_data[user][header] = "{:.2f}".format((normalized_sum)*100.0)
-        
+
         return
 
     else:
@@ -539,9 +550,10 @@ def process_source(name, specification, config):
         # Unsupported data type
         return
 
+
 for (name, specification) in config.get("sources", dict()).items():
     process_source(name=name, specification=specification, config=config)
-    
+
 
 # Patch the data
 apply_patch(config)
@@ -553,6 +565,26 @@ output_filename = os.path.join(
 
 logger.debug("Output path: {}".format(output_filename))
 
+# FIXME: Integrate this in the codebase somehow as a feature.
+
+# students = json.loads(open("data/roster.json").read())
+# seniors = []
+# for student in students:
+#     if student["year"] == "2019":
+#         userdata = full_data[student["netid"]]
+#         student["grade"] = userdata.get("Letter")
+#         seniors.append(student)
+
+# headers = ["last", "first", "netid", "puid", "grade"]
+# rows = []
+# for row in seniors:
+#     rows.append(list(map(lambda x: row[x] or "<MISSING>", headers)))
+# rows.sort(key=lambda row: row[headers.index("last")])
+# rows = [headers] + rows
+# seniors_csv = "\n".join([",".join(row) for row in rows])
+# open("seniors.csv", "w").write(seniors_csv)
+
+
 try:
     with open(output_filename, "w") as f:
         f.write(",".join(full_headers))
@@ -560,8 +592,10 @@ try:
         for user in full_data.keys():
             userdata = full_data[user]
             userdata[config["output"]["username"]] = user
-            f.write(",".join(map(lambda colname: userdata.get(colname, ""), full_headers)))
+            f.write(
+                ",".join(map(lambda colname: userdata.get(colname, ""), full_headers)))
             f.write("\n")
 
 except BrokenPipeError:
-    logger.warning("Data could not be piped to next program because of a pipe error")
+    logger.warning(
+        "Data could not be piped to next program because of a pipe error")
