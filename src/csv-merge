@@ -454,11 +454,14 @@ def process_source(name, specification, config):
                 " - Evaluating '{}' for '{}' => {}".format(username, name, record))
             points_numerator = 0.0
             points_denominator = 0.0
+            points_partial_avg = 0.0
+            points_partial_w = 0.0
 
             arg_partial = specification.get("partial", False)
             arg_prorata = specification.get("prorata", False)
             include_list = specification.get("include", list())
             extra_list = specification.get("extra", list())
+            standard_normalization = specification.get("normalization", None)
             missing = False
             corrupt = False
 
@@ -487,29 +490,49 @@ def process_source(name, specification, config):
                             corrupt = True
                             continue
 
+                # FIXME: Clean up + check for 0/0
                 points_numerator += row["weight"] * row["value"]
-                points_denominator += row["weight"] * row["normalization"]
+                if "normalization" in item:
+                    points_denominator += row["weight"] * item["normalization"]
+                    points_partial_avg += row["weight"] * \
+                        (float(row["value"]) / item["normalization"])
+                    points_partial_w += row["weight"]
+                elif standard_normalization:
+                    points_denominator += (
+                        row["weight"] * standard_normalization)
+                    points_partial_avg += row["weight"] * \
+                        (float(row["value"]) / standard_normalization)
+                    points_partial_w += row["weight"]
+                else:
+                    points_denominator += row["weight"] * row["normalization"]
+                    points_partial_avg += row["weight"] * \
+                        (float(row["value"]) / row["normalization"])
+                    points_partial_w += row["weight"]
 
-            for item in extra_list:
+            # NOTE: Refactor or disappear
+            # for item in extra_list:
 
-                row = extract_spec_internal_ref(
-                    username=username,
-                    record=record,
-                    item=item,
-                    maxs=maxs
-                )
-                logger.debug("   * Processing Extra: {}".format(row))
+            #     row = extract_spec_internal_ref(
+            #         username=username,
+            #         record=record,
+            #         item=item,
+            #         maxs=maxs
+            #     )
+            #     logger.debug("   * Processing Extra: {}".format(row))
 
-                # Now we have everything to make our calculation
-                if not row or not row["available"]:
-                    continue
+            #     # Now we have everything to make our calculation
+            #     if not row or not row["available"]:
+            #         continue
 
-                points_numerator += row["weight"] * row["value"]
+            #     points_numerator += row["weight"] * row["value"]
 
-            logger.debug("=> User '{}', normalized sum '{}': {} / {}".format(
-                username, name, points_numerator, points_denominator))
+            # logger.debug("=> User '{}', normalized sum '{}': {} / {}".format(
+            #     username, name, points_numerator, points_denominator))
+            points_partial_avg = points_partial_avg / points_partial_w
+            logger.debug("=> User '{}', normalized sum '{}': {}".format(
+                username, name, points_partial_avg))
 
-            if corrupt or points_denominator < 0.9:
+            if corrupt:
                 logger.debug(
                     "=> User '{}', normalized sum '{}': Not available".format(username, name))
                 continue
@@ -521,7 +544,8 @@ def process_source(name, specification, config):
 
             # Compute total
             try:
-                normalized_sum = float(points_numerator/points_denominator)
+                # normalized_sum = float(points_numerator/points_denominator)
+                normalized_sum = float(points_partial_avg)
             except:
                 logger.debug("Unexpected error while computing normalized sum")
                 raise

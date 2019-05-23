@@ -59,19 +59,20 @@ sources:
     include: ["PS0", "PS1", "PS2", "PS3", "PS4", "PS5", "SD1", "SD2", "SD3", "SD4", "SD5"]
     # extra: ["PS1-Extra", "PS2-Extra", "PS3-Extra", "PS4-Extra"]
     partial: True
-    prorata: True
+    prorata: False
   CalculatedOverall:
     caption: "Overall"
     type: "normalized-sum"
     include:
       - value: "Mid1"
-        weight: 15.0
+        weight: 0.15
       - value: "Mid2"
-        weight: 20.0
+        weight: 0.20
       - value: "Final"
-        weight: 30.0
+        weight: 0.30
       - value: "Homework"
-        weight: 35.0
+        weight: 0.35
+        normalization: 100.0
   LetterGrade:
     caption: "Letter"
     type: "range"
